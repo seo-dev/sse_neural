@@ -18,6 +18,33 @@ void maxpool2x2_SSE(float* input, float* output, int width, int height) {
     }
 }
 
+void maxpool_sse(float* input, float* output, int input_width, int input_height) {
+    // Output dimensions
+    int output_width = (input_width - 3) / 2 + 1;
+    int output_height = (input_height - 3) / 2 + 1;
+
+    // Iterate over each output element
+    for (int y = 0; y < output_height; ++y) {
+        for (int x = 0; x < output_width; ++x) {
+            // Calculate input indices
+            int input_x = x * 2;
+            int input_y = y * 2;
+
+            // Load 4 consecutive elements from input
+            __m128 v = _mm_loadu_ps(&input[input_y * input_width + input_x]);
+
+            // Perform maxpooling operation
+            for (int i = 0; i < 2; ++i) {
+                __m128 temp = _mm_loadu_ps(&input[(input_y + i) * input_width + input_x]);
+                v = _mm_max_ps(v, temp);
+            }
+
+            // Store the result in output
+            _mm_storeu_ps(&output[y * output_width + x], v);
+        }
+    }
+}
+
 void maxpool3x3_SSE(float* input, float* output, int width, int height) {
     // 입력 이미지의 너비와 높이를 고려하여 반복
     for (int i = 0; i <= height - 3; i += 3) {
