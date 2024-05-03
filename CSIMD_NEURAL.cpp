@@ -18,6 +18,32 @@ void maxpool2x2_SSE(float* input, float* output, int width, int height) {
     }
 }
 
+void maxpool_std(const float* input, float* output, int input_width, int input_height) {
+    // Output dimensions
+    int output_width = (input_width - 3) / 2 + 1;
+    int output_height = (input_height - 3) / 2 + 1;
+
+    // Iterate over each output element
+    for (int y = 0; y < output_height; ++y) {
+        for (int x = 0; x < output_width; ++x) {
+            // Calculate input indices
+            int input_x = x * 2;
+            int input_y = y * 2;
+
+            // Find maximum value in 3x3 region
+            float max_val = input[input_y * input_width + input_x];
+            for (int dy = 0; dy < 3; ++dy) {
+                for (int dx = 0; dx < 3; ++dx) {
+                    max_val = std::max(max_val, input[(input_y + dy) * input_width + input_x + dx]);
+                }
+            }
+
+            // Store the maximum value in output
+            output[y * output_width + x] = max_val;
+        }
+    }
+}
+
 void maxpool_sse(float* input, float* output, int input_width, int input_height) {
     // Output dimensions
     int output_width = (input_width - 3) / 2 + 1;
