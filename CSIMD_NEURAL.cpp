@@ -79,6 +79,36 @@ void maxpool3x3_stride2_SSE(float* input, float* output, int width, int height) 
     }
 }
 
+void maxPooling3x3SSE(float* input, float* output, int width, int height) {
+    int outWidth = width / 2;
+    int outHeight = height / 2;
+
+    for (int y = 0; y < height - 1; y += 2) {
+        for (int x = 0; x < width - 1; x += 2) {
+            // Load 9 pixels (3x3 region)
+            __m128 row1 = _mm_loadu_ps(&input[y * width + x]);
+            __m128 row2 = _mm_loadu_ps(&input[(y + 1) * width + x]);
+            __m128 row3 = _mm_loadu_ps(&input[(y + 2) * width + x]);
+
+            // Get max of first 3 elements in each row
+            __m128 max1 = _mm_max_ps(_mm_shuffle_ps(row1, row1, _MM_SHUFFLE(1, 0, 3, 2)), row1);
+            max1 = _mm_max_ps(_mm_shuffle_ps(max1, max1, _MM_SHUFFLE(2, 1, 0, 3)), max1);
+
+            __m128 max2 = _mm_max_ps(_mm_shuffle_ps(row2, row2, _MM_SHUFFLE(1, 0, 3, 2)), row2);
+            max2 = _mm_max_ps(_mm_shuffle_ps(max2, max2, _MM_SHUFFLE(2, 1, 0, 3)), max2);
+
+            __m128 max3 = _mm_max_ps(_mm_shuffle_ps(row3, row3, _MM_SHUFFLE(1, 0, 3, 2)), row3);
+            max3 = _mm_max_ps(_mm_shuffle_ps(max3, max3, _MM_SHUFFLE(2, 1, 0, 3)), max3);
+
+            // Get the final max from all rows
+            __m128 finalMax = _mm_max_ps(_mm_max_ps(max1, max2), max3);
+
+            // Store the result in output
+            _mm_store_ss(&output[(y / 2) * outWidth + (x / 2)], finalMax);
+        }
+    }
+}
+
 // const int width = 10;
 // const int height = 10;
 // float input[100];
