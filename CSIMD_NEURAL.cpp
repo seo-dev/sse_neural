@@ -43,8 +43,7 @@ void maxpool_std(const float* input, float* output, int input_width, int input_h
         }
     }
 }
-
-void maxpool_sse(float* input, float* output, int input_width, int input_height) {
+void maxpool_sse(const float* input, float* output, int input_width, int input_height) {
     // Output dimensions
     int output_width = (input_width - 3) / 2 + 1;
     int output_height = (input_height - 3) / 2 + 1;
@@ -56,17 +55,21 @@ void maxpool_sse(float* input, float* output, int input_width, int input_height)
             int input_x = x * 2;
             int input_y = y * 2;
 
-            // Load 4 consecutive elements from input
-            __m128 v = _mm_loadu_ps(&input[input_y * input_width + input_x]);
+            // Load 3x3 region into SIMD registers
+            __m128 v0 = _mm_loadu_ps(&input[(input_y + 0) * input_width + input_x]);
+            __m128 v1 = _mm_loadu_ps(&input[(input_y + 1) * input_width + input_x]);
+            __m128 v2 = _mm_loadu_ps(&input[(input_y + 2) * input_width + input_x]);
 
-            // Perform maxpooling operation
-            for (int i = 0; i < 2; ++i) {
-                __m128 temp = _mm_loadu_ps(&input[(input_y + i) * input_width + input_x]);
-                v = _mm_max_ps(v, temp);
-            }
+            // Combine adjacent pairs to find maximums
+            __m128 max1 = _mm_max_ps(v0, v1);
+            __m128 max2 = _mm_max_ps(max1, v2);
+
+            // Shuffle to get the maximums of each pair
+            __m128 shuf = _mm_shuffle_ps(max2, max2, _MM_SHUFFLE(3, 1, 2, 0));
+            __m128 max3 = _mm_max_ps(max2, shuf);
 
             // Store the result in output
-            _mm_storeu_ps(&output[y * output_width + x], v);
+            _mm_storeu_ps(&output[y * output_width + x], max3);
         }
     }
 }
