@@ -18,6 +18,98 @@ void maxpool2x2_SSE(float* input, float* output, int width, int height) {
     }
 }
 
+void neon_max_pooling(float32x4_t *input, int input_height, int input_width, int channels,
+                      float32x4_t *output, int output_height, int output_width) {
+  int kernel_size = 3;
+  int stride = 2;
+  int padding = 1;
+
+  // 출력 크기 계산
+  int output_size = output_height * output_width * channels;
+
+  // 출력 요소 각각에 대해 루프
+  for (int c = 0; c < channels; c++) {
+    for (int y = 0; y < output_height; y++) {
+      for (int x = 0; x < output_width; x++) {
+        // 입력 좌표 계산
+        int input_y = y * stride - padding;
+        int input_x = x * stride - padding;
+
+        // 입력 데이터에서 3x3 커널 로드
+        float32x4_t kernel[3][3];
+        for (int ky = 0; ky < kernel_size; ky++) {
+          for (int kx = 0; kx < kernel_size; kx++) {
+            int input_idx = (input_y + ky) * input_width * channels + (input_x + kx) * channels + c;
+            kernel[ky][kx] = vld1q_f32(&input[input_idx]);
+          }
+        }
+
+        // NEON 인스트럭션을 사용하여 최대 풀링 수행
+        float32x4_t max_val = vdupq_n_f32(-FLT_MAX);
+        for (int ky = 0; ky < kernel_size; ky++) {
+          for (int kx = 0; kx < kernel_size; kx++) {
+            max_val = vmaxq_f32(max_val, kernel[ky][kx]);
+          }
+        }
+
+        // 최대 풀링된 값을 출력 배열에 저장
+        int output_idx = y * output_width * channels + x * channels + c;
+        vst1q_f32(&output[output_idx], max_val);
+      }
+    }
+  }
+}
+
+void neon_conv2d(float32x4_t *input, int input_height, int input_width, int channels,
+                 float32x4_t *weights, int kernel_size, int stride,
+                 float32x4_t *output, int output_height, int output_width) {
+  int padding = (kernel_size - 1) / 2;
+
+  // 출력 크기 계산
+  int output_size = output_height * output_width * channels;
+
+  // 출력 요소 각각에 대해 루프
+  for (int c = 0; c < channels; c++) {
+    for (int y = 0; y < output_height; y++) {
+      for (int x = 0; x < output_width; x++) {
+        // 입력 좌표 계산
+        int input_y = y * stride - padding;
+        int input_x = x * stride - padding;
+
+        // 가중치에서 3x3 커널 로드
+        float32x4_t kernel[3][3];
+        for (int ky = 0; ky < kernel_size; ky++) {
+          for (int kx = 0; kx < kernel_size; kx++) {
+            int weight_idx = (ky * kernel_size + kx) * channels + c;
+            kernel[ky][kx] = vld1q_f32(&weights[weight_idx]);
+          }
+        }
+
+        // 입력 패치 로드
+        float32x4_t input_patch[3][3];
+        for (int ky = 0; ky < kernel_size; ky++) {
+          for (int kx = 0; kx < kernel_size; kx++) {
+            int input_idx = (input_y + ky) * input_width * channels + (input_x + kx) * channels + c;
+            input_patch[ky][kx] = vld1q_f32(&input[input_idx]);
+          }
+        }
+
+        // NEON 명령어를 사용하여畳み込み 수행
+        float32x4_t sum = vdupq_n_f32(0.0f);
+        for (int ky = 0; ky < kernel_size; ky++) {
+          for (int kx = 0; kx < kernel_size; kx++) {
+            sum = vfmaq_f32(sum, kernel[ky][kx], input_patch[ky][kx]);
+          }
+        }
+
+        // 출력 값을 저장
+        int output_idx = y * output_width * channels + x * channels + c;
+        vst1q_f32(&output[output_idx], sum);
+      }
+    }
+  }
+}
+
 void maxpool_std(const float* input, float* output, int input_width, int input_height) {
     // Output dimensions
     int output_width = (input_width - 3) / 2 + 1;
