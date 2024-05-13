@@ -165,3 +165,48 @@ void dynamic_maxpool_SSE(float* input, float* output, int width, int height, int
         }
     }
 }
+
+
+// 5x5 컨볼루션을 수행하는 함수
+void convolution5x5(float* input, float* output, float* kernel, int width, int height) {
+    for (int y = 2; y < height-2; y++) {
+        for (int x = 2; x < width-2; x++) {
+            float32x4_t sum = vdupq_n_f32(0.0);  // 합계를 저장할 벡터 초기화
+
+            for (int ky = -2; ky <= 2; ky++) {
+                for (int kx = -2; kx <= 2; kx++) {
+                    // 입력 이미지에서 현재 위치에 커널 값을 적용
+                    float pixel = input[(y+ky)*width + (x+kx)];
+                    float kval = kernel[(ky+2)*5 + (kx+2)];
+
+                    // NEON 명령어를 사용하여 곱셈 후 누적
+                    float32x4_t pixel_vec = vdupq_n_f32(pixel);
+                    float32x4_t kval_vec = vdupq_n_f32(kval);
+                    sum = vmlaq_f32(sum, pixel_vec, kval_vec);
+                }
+            }
+
+            // 벡터 내의 모든 값 합산
+            float result = vgetq_lane_f32(sum, 0) + vgetq_lane_f32(sum, 1) + 
+                           vgetq_lane_f32(sum, 2) + vgetq_lane_f32(sum, 3);
+
+            // 결과를 출력 배열에 저장
+            output[y*width + x] = result;
+        }
+    }
+}
+
+int main() {
+    // 예시 이미지 및 커널 데이터, 적절한 초기화 필요
+    float input[100] = {/* 이미지 데이터 */};
+    float output[100] = {0};
+    float kernel[25] = {1, 0, -1, 0, 1, 0, 1, -1, 1, 0, -1, -1, 5, -1, -1, 0, 1, -1, 1, 0, 1, 0, -1, 0, 1}; // 5x5 커널
+
+    int width = 10;
+    int height = 10;
+
+    convolution5x5(input, output, kernel, width, height);
+
+    std::cout << "Convolution completed." << std::endl;
+    return 0;
+}
